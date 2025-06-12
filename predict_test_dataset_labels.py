@@ -14,7 +14,7 @@ from torch.nn import functional as F
 from torchvision.transforms import ToTensor, Normalize, Resize, Compose, Grayscale
 
 # Import the model definition from the training script
-from train_particle_count_model import ParticleCounterCNN, calculate_mean_std
+from train_models import ParticleCounterCNN, calculate_mean_std
 
 def predict_folder(test_folder_path, model_path='particle_count_model.pth'):
     """
