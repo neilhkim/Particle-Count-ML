@@ -3,6 +3,9 @@ __pycache__/
 venv/
 # .venv/
 
+# Backups
+backup/
+
 # PyTorch models 
 pths/
 *.pth
@@ -12,7 +15,7 @@ data/
 trainset*/
 
 # Results and logs
-training_history_comparison.png
+train*.png
 
 # IDE
 .vscode/
@@ -26,3 +29,7 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+
+# Output csv files
+*.csv
