@@ -278,7 +278,7 @@ def run_epoch(model, loader, criterion, opt=None, ordinal=False):
     corr = np.zeros(5, int)  # correct predictions per class
     tot  = np.zeros(5, int)  # total predictions per class
     loss_sum = 0.0
-    for x, y in tqdm(loader, leave=False):  # leave=False so progress bars don't stack
+    for x, y in tqdm(loader, leave=False, disable=False, ncols=80):  # fixed width progress bars
         x, y = x.to(device), y.to(device)
         logits = model(x)
         if ordinal:
@@ -379,6 +379,10 @@ def train_model(model, model_name, train_loader, val_loader, epochs, lr, gamma, 
               f"Val: {val_loss:.4f}/{val_acc*100:.2f}% | "
               f"LR: {current_lr:.2e}")
         
+        # add debug info for stuck training
+        if epoch > 3 and abs(val_acc - history['val_accs'][-2]) < 0.001:
+            print(f"   Warning: validation accuracy plateau detected")
+
         # save best model with descriptive name - only save when validation improves
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -414,7 +418,16 @@ if __name__ == '__main__':
     ap.add_argument('--mixup',  type=float, default=0.0)  # mixup alpha, 0 = disabled
     ap.add_argument('--resume')  # not implemented yet but keeping for future
     ap.add_argument('--save_name', default='o3v2_best_model')  # legacy name
+    ap.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
     args = ap.parse_args()
+
+    # Set all random seeds for reproducibility
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # turn off for deterministic behavior
 
     # identify dataset tag for filenames - so we know what we trained on
     if args.data_root:
