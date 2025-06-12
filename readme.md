@@ -71,6 +71,8 @@ Performance on 5-class particle counting (0-4 particles): **To be tested thoroug
 
 *Results will be updated once comprehensive benchmarking is completed*
 
+![2025-06-11 loss and accuracy](https://github.com/user-attachments/assets/10fb20b3-b09a-4e1d-9fe2-c86b3ccbec8a)
+
 ## CORAL Ordinal Regression
 
 Instead of treating particle counts as independent classes, CORAL uses the natural ordering:
