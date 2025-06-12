@@ -5,9 +5,12 @@ Neural network models for counting particles in microscopy images using PyTorch.
 ## Features
 
 - Multiple CNN architectures (Baseline, Enhanced, MobileNet+CORAL)
-- CORAL ordinal regression for ordered counting
-- Focal Loss for class imbalance handling
-- Automated model comparison and classification reports
+- CORAL ordinal regression for ordered counting tasks
+- Focal Loss for handling class imbalance
+- Automated model comparison with training history plots
+- Per-model random seed control for reproducible experiments
+- Adaptive learning rate scheduling based on validation performance
+- Synthetic dataset generation with realistic PSF simulation
 
 ## Quick Start
 
@@ -15,65 +18,119 @@ Neural network models for counting particles in microscopy images using PyTorch.
 # Install dependencies
 pip install torch torchvision timm coral-pytorch scikit-learn matplotlib tqdm
 
-# Train multiple architectures on synthetic data
-python train_models.py --synthetic 10000 --arch baseline,enhanced,mobilenet
+# Train on real dataset with different seeds per model
+python train_models.py --data_root trainset05 --arch enhanced,mobilenet --epochs 20 --seed 42 123
 
-# Train on real dataset
-python train_models.py --data_root trainset05 --arch mobilenet --epochs 80
+# Train single model with custom learning rate
+python train_models.py --data_root trainset05 --arch enhanced --epochs 15 --lr 0.001
 
-# Resume training from checkpoint - to be implemented
+# Resume training from checkpoint (coming soon)
+python train_models.py --resume enhanced-CNN_422.3Kparams-trainset05-epoch10.pth
 ```
 
 ## Model Architectures
 
-1. **Baseline CNN**: Simple 3-layer network for quick experiments (23.8K parameters)
-2. **Enhanced CNN**: Deeper network with LeakyReLU and batch normalization (422.4K parameters)
-3. **MobileNet+CORAL**: Pretrained backbone with ordinal regression head (1.6M parameters)
+1. **Baseline CNN**: Simple 3-layer network for quick experiments (~24K parameters)
+2. **Enhanced CNN**: Deeper network with LeakyReLU and batch normalization (~422K parameters)  
+3. **MobileNet+CORAL**: Pretrained MobileNetV3-Small backbone with ordinal regression head (~1.6M parameters)
 
 ## Scripts
 
-- `train_models.py`: Multi-architecture training with comparison plots
-- `generate_dataset.py`: Synthetic particle dataset generation with PSF convolution
-- `predict_test_dataset_labels.py`: Predict particle counts on test images with confidence scores
+- `train_models.py`: Multi-architecture training with automatic comparison plots
+- `generate_dataset.py`: Synthetic particle dataset generation with Gaussian PSF convolution
+- `predict_test_dataset_labels.py`: Batch prediction on test images with confidence scores
+
+## Training Features
+
+### Adaptive Learning Rate
+- Uses `ReduceLROnPlateau` scheduler that reduces LR when validation loss plateaus
+- More stable than epoch-based scheduling and compatible with resume functionality
+- Patience of 5 epochs before reducing LR by factor of 0.5
+
+### Per-Model Random Seeds
+```bash
+# Different seed for each architecture
+python train_models.py --arch enhanced,mobilenet --seed 42 123
+
+# Same seed for all models (original behavior)  
+python train_models.py --arch enhanced,mobilenet --seed 42
+```
+
+### Data Augmentation
+- Random horizontal/vertical flips and rotations (particles are rotationally symmetric)
+- Random affine transformations (translation, scaling)
+- Optional MixUp regularization with `--mixup` parameter
 
 ## Performance
 
-Typical results on 5-class particle counting (0-4 particles):
-- Baseline CNN: to be tested thoroughly
-- Enhanced CNN: to be tested thoroughly
-- MobileNet+CORAL: to be tested thoroughly
+Performance on 5-class particle counting (0-4 particles): **To be tested thoroughly**
+
+- **Baseline CNN**: Performance testing in progress
+- **Enhanced CNN**: Performance testing in progress  
+- **MobileNet+CORAL**: Performance testing in progress
+
+*Results will be updated once comprehensive benchmarking is completed*
+
+## CORAL Ordinal Regression
+
+Instead of treating particle counts as independent classes, CORAL uses the natural ordering:
+- **Traditional**: P(0), P(1), P(2), P(3), P(4) - treats each count independently
+- **CORAL**: P(≥1), P(≥2), P(≥3), P(≥4) - learns cumulative probabilities
+
+This approach better captures that 2 particles is "closer" to 3 particles than to 0 particles.
 
 ## Usage Examples
 
 ```bash
-# Compare all architectures
-python train_models.py --arch baseline,enhanced,mobilenet --epochs 50
+# Compare all architectures with training history plots
+python train_models.py --data_root trainset05 --arch baseline,enhanced,mobilenet --epochs 30
+
+# Longer training with separate validation directory
+python train_models.py --train_dir trainset05 --val_dir valset05 --arch mobilenet --epochs 80
+
+# Enable MixUp regularization
+python train_models.py --data_root trainset05 --arch enhanced --mixup 0.2 --epochs 25
 ```
-
-## CORAL Ordinal Regression
-
-Instead of independent classes, CORAL treats counting as ordered decisions:
-- Traditional: P(0), P(1), P(2), P(3), P(4)
-- CORAL: P(≥1), P(≥2), P(≥3), P(≥4)
-
-This approach better handles the natural ordering of particle counts.
 
 ## Requirements
 
 - Python 3.7+
 - PyTorch 1.9+
-- torchvision, timm, coral-pytorch, scikit-learn, matplotlib, tqdm
+- torchvision, timm, coral-pytorch, scikit-learn, matplotlib, tqdm, numpy
 
 ## Project Structure
 
 ```
 Particle-Count-ML/
-├── train_models.py               # Multi-architecture comparison
-├── generate_dataset.py           # Synthetic dataset generation
-├── predict_test_dataset_labels.py # Test image prediction
-├── README.md
-├── requirements.txt
-└── .gitignore
+├── train_models.py               # Main training script with multi-architecture support
+├── generate_dataset.py           # Synthetic dataset generation with PSF simulation  
+├── predict_test_dataset_labels.py # Batch prediction with confidence scoring
+├── README.md                     # This file
+├── requirements.txt              # Python dependencies
+├── .gitignore                    # Excludes models, datasets, results
+└── trainset*/                    # Training datasets (excluded from git)
+    ├── 0/                        # Images with 0 particles
+    ├── 1/                        # Images with 1 particle
+    ├── 2/                        # Images with 2 particles
+    ├── 3/                        # Images with 3 particles
+    └── 4/                        # Images with 4 particles
 ```
 
-Note: Model checkpoints (*.pth), datasets (trainset*/), and results (*.png, *.csv) are excluded from version control.
+## Model Checkpoints
+
+Trained models are saved with descriptive names including parameter count:
+- `enhanced-CNN_422.3Kparams-trainset05-epoch15.pth`
+- `mobilenet-CORAL_1.6Mparams-synthetic-epoch25.pth`
+
+Each checkpoint includes model state, optimizer state, training metrics, and metadata for easy resuming.
+
+## Troubleshooting
+
+**Low accuracy (~20%)**:
+- Check learning rate isn't too low due to aggressive scheduling
+- Verify data loading (should see different accuracies with different seeds)
+- Ensure sufficient training epochs (try 20+ for real datasets)
+
+**Memory issues**:
+- Reduce batch size with `--batch 32`
+- Train one architecture at a time
