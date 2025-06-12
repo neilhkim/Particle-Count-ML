@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+venv/
+# .venv/
+
+# PyTorch models 
+pths/
+*.pth
+
+# Data files (too large)
+data/
+trainset*/
+
+# Results and logs
+training_history_comparison.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
