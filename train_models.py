@@ -345,11 +345,11 @@ def train_model(model, model_name, train_loader, val_loader, epochs, lr, gamma, 
     # tried different optimizers: SGD, Adam, AdamW - AdamW seems to work best
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     
-    # Use get_last_lr() instead of verbose=True to avoid warning
-    # step every epochs//3 seemed reasonable, could tune this
-    # ensure step_size is at least 1 to avoid division by zero
-    step_size = max(1, epochs//3)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
+    # Use constant learning rate - better for resume functionality and generally more stable
+    # If LR scheduling is needed, it should be based on validation loss plateaus, not epochs
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5, verbose=True, min_lr=1e-7
+    )
     
     model = model.to(device)
     best_val_acc = 0.0
@@ -363,9 +363,9 @@ def train_model(model, model_name, train_loader, val_loader, epochs, lr, gamma, 
         with torch.no_grad():
             val_loss, val_acc, val_per_class = run_epoch(model, val_loader, criterion, None, ordinal)
         
-        # update learning rate
-        scheduler.step()
-        current_lr = scheduler.get_last_lr()[0]  # Use get_last_lr() instead of verbose
+        # update learning rate based on validation loss (not epoch count)
+        scheduler.step(val_loss)
+        current_lr = optimizer.param_groups[0]['lr']  # get current LR from optimizer
         
         # record history for plotting later
         history['train_losses'].append(train_loss)
@@ -418,16 +418,11 @@ if __name__ == '__main__':
     ap.add_argument('--mixup',  type=float, default=0.0)  # mixup alpha, 0 = disabled
     ap.add_argument('--resume')  # not implemented yet but keeping for future
     ap.add_argument('--save_name', default='o3v2_best_model')  # legacy name
-    ap.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
+    ap.add_argument('--seed', type=int, nargs='+', default=[42], help='random seed(s) for reproducibility - can specify multiple seeds for different models')
     args = ap.parse_args()
 
-    # Set all random seeds for reproducibility
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False  # turn off for deterministic behavior
+    # Don't set global seeds here - will set per model instead
+    # This allows different models to use different seeds
 
     # identify dataset tag for filenames - so we know what we trained on
     if args.data_root:
@@ -500,7 +495,20 @@ if __name__ == '__main__':
     print(f"Training architectures: {', '.join(architectures)}")
     
     # train each architecture - could parallelize this but usually memory-limited anyway
-    for arch_name in architectures:
+    for i, arch_name in enumerate(architectures):
+        if arch_name not in model_classes:
+            print(f"Warning: Unknown architecture: {arch_name}, skipping...")
+            continue
+        
+        # Set random seed for this model (cycle through seeds if fewer provided than models)
+        current_seed = args.seed[i % len(args.seed)]
+        print(f"\nSetting seed {current_seed} for {arch_name}")
+        np.random.seed(current_seed)
+        torch.manual_seed(current_seed)
+        torch.cuda.manual_seed(current_seed)
+        torch.cuda.manual_seed_all(current_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
         if arch_name not in model_classes:
             print(f"Warning: Unknown architecture: {arch_name}, skipping...")
             continue
